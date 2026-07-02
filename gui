@@ -1,182 +1,93 @@
--- GUI CLEAN + FIXED
+local script = Instance.new("LocalScript", boton dance_1)
 
+local boton = script.Parent
 local player = game.Players.LocalPlayer
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Parent = player:WaitForChild("PlayerGui")
+local runService = game:GetService("RunService")
 
--- FRAME PRINCIPAL
-local Frame = Instance.new("Frame")
-Frame.Parent = ScreenGui
-Frame.Size = UDim2.new(0, 180, 0, 200)
-Frame.Position = UDim2.new(0.75, 0, 0.3, 0)
-Frame.BackgroundColor3 = Color3.fromRGB(57,57,57)
+local IDLE_ANIM = "rbxassetid://118856351023466"
+local RUN_ANIM = "rbxassetid://80815742707964"
 
-local UICorner = Instance.new("UICorner", Frame)
+local enabled = false
+local loopConnection
+local currentTrack
 
--- LABEL
-local label = Instance.new("TextLabel")
-label.Parent = Frame
-label.Size = UDim2.new(1,0,0,30)
-label.Text = "YT: EL_YAYASAS"
-label.TextColor3 = Color3.fromRGB(255,0,0)
-label.BackgroundTransparency = 1
-
-------------------------------------------------
--- FLY BUTTON
-------------------------------------------------
-local flyBtn = Instance.new("TextButton")
-flyBtn.Parent = Frame
-flyBtn.Size = UDim2.new(0,70,0,25)
-flyBtn.Position = UDim2.new(0,5,0,40)
-flyBtn.Text = "FLY"
-
-local flying = false
-local rs = game:GetService("RunService")
-local uis = game:GetService("UserInputService")
-
-local function fly()
+local function getHumanoid()
 	local char = player.Character
 	if not char then return end
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
-
-	local bv = Instance.new("BodyVelocity", hrp)
-	bv.MaxForce = Vector3.new(1e9,1e9,1e9)
-
-	flying = true
-
-	local conn
-	conn = rs.RenderStepped:Connect(function()
-		if not flying then conn:Disconnect() return end
-		bv.Velocity = workspace.CurrentCamera.CFrame.LookVector * 60
-	end)
+	return char:FindFirstChildOfClass("Humanoid")
 end
 
-flyBtn.MouseButton1Click:Connect(function()
-	flying = not flying
-	if flying then
-		fly()
+local function stopAnim()
+	if loopConnection then
+		loopConnection:Disconnect()
+		loopConnection = nil
 	end
-end)
 
-------------------------------------------------
--- SPEED BUTTON
-------------------------------------------------
-local speedBtn = Instance.new("TextButton")
-speedBtn.Parent = Frame
-speedBtn.Size = UDim2.new(0,70,0,25)
-speedBtn.Position = UDim2.new(0,90,0,40)
-speedBtn.Text = "SPEED"
-
-local speedOn = false
-
-speedBtn.MouseButton1Click:Connect(function()
-	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-	if not hum then return end
-
-	speedOn = not speedOn
-	hum.WalkSpeed = speedOn and 50 or 16
-end)
-
-------------------------------------------------
--- TP BUTTON
-------------------------------------------------
-local tpBtn = Instance.new("TextButton")
-tpBtn.Parent = Frame
-tpBtn.Size = UDim2.new(0,70,0,25)
-tpBtn.Position = UDim2.new(0,90,0,75)
-tpBtn.Text = "TP"
-
-local tp = false
-local mouse = player:GetMouse()
-
-tpBtn.MouseButton1Click:Connect(function()
-	tp = not tp
-end)
-
-mouse.Button1Down:Connect(function()
-	if not tp then return end
-	local char = player.Character
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	if hrp and mouse.Hit then
-		hrp.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0,3,0))
+	if currentTrack then
+		currentTrack:Stop()
+		currentTrack:Destroy()
+		currentTrack = nil
 	end
-end)
-
-------------------------------------------------
--- DANCE FIXED (PRO)
-------------------------------------------------
-local danceBtn = Instance.new("TextButton")
-danceBtn.Parent = Frame
-danceBtn.Size = UDim2.new(0,70,0,25)
-danceBtn.Position = UDim2.new(0,5,0,75)
-danceBtn.Text = "DANCE"
-
-local IDLE = "rbxassetid://118856351023466"
-local RUN = "rbxassetid://80815742707964"
-
-local danceOn = false
-local animTrack
-local loop
-
-local function stopDance()
-	danceOn = false
-	if loop then loop:Disconnect() loop = nil end
-	if animTrack then animTrack:Stop() animTrack:Destroy() animTrack = nil end
 end
 
 local function playAnim(id)
-	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-	if not hum then return end
+	local humanoid = getHumanoid()
+	if not humanoid then return end
 
-	local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
+	local animator = humanoid:FindFirstChildOfClass("Animator")
+	if not animator then
+		animator = Instance.new("Animator")
+		animator.Parent = humanoid
+	end
 
-	if animTrack then
-		animTrack:Stop()
-		animTrack:Destroy()
+	if currentTrack then
+		currentTrack:Stop()
+		currentTrack:Destroy()
 	end
 
 	local anim = Instance.new("Animation")
 	anim.AnimationId = id
 
-	animTrack = animator:LoadAnimation(anim)
-	animTrack.Priority = Enum.AnimationPriority.Action
-	animTrack.Looped = true
-	animTrack:Play()
+	currentTrack = animator:LoadAnimation(anim)
+	currentTrack.Priority = Enum.AnimationPriority.Action
+	currentTrack.Looped = true
+	currentTrack:Play()
 end
 
-danceBtn.MouseButton1Click:Connect(function()
-	danceOn = not danceOn
+local function startLoop()
+	if loopConnection then return end
 
-	if not danceOn then
-		stopDance()
-		return
-	end
+	loopConnection = runService.RenderStepped:Connect(function()
+		if not enabled then return end
 
-	loop = rs.RenderStepped:Connect(function()
-		if not danceOn then return end
+		local humanoid = getHumanoid()
+		if not humanoid then return end
 
-		local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-		if not hum then return end
+		local moving = humanoid.MoveDirection.Magnitude > 0.1
 
-		if hum.MoveDirection.Magnitude > 0.1 then
-			playAnim(RUN)
+		if moving then
+			playAnim(RUN_ANIM)
 		else
-			playAnim(IDLE)
+			playAnim(IDLE_ANIM)
 		end
 	end)
+end
+
+local function stopAll()
+	enabled = false
+	stopAnim()
+end
+
+boton.MouseButton1Click:Connect(function()
+	enabled = not enabled
+
+	if not enabled then
+		stopAll()
+	else
+		startLoop()
+	end
 end)
 
-------------------------------------------------
--- RESET
-------------------------------------------------
-local resetBtn = Instance.new("TextButton")
-resetBtn.Parent = Frame
-resetBtn.Size = UDim2.new(0,70,0,25)
-resetBtn.Position = UDim2.new(0,45,0,140)
-resetBtn.Text = "RESET"
-
-resetBtn.MouseButton1Click:Connect(function()
-	local char = player.Character
-	if char then char:BreakJoints() end
+player.CharacterAdded:Connect(function()
+	stopAll()
 end)
