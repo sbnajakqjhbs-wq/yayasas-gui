@@ -1,93 +1,165 @@
-local script = Instance.new("LocalScript", boton dance_1)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
-local boton = script.Parent
-local player = game.Players.LocalPlayer
-local runService = game:GetService("RunService")
+local lp = Players.LocalPlayer
 
-local IDLE_ANIM = "rbxassetid://118856351023466"
-local RUN_ANIM = "rbxassetid://80815742707964"
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "AdminUI"
+gui.Parent = lp:WaitForChild("PlayerGui")
 
-local enabled = false
-local loopConnection
-local currentTrack
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 360, 0, 450)
+frame.Position = UDim2.new(0.5, -180, 0.5, -225)
+frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
 
-local function getHumanoid()
-	local char = player.Character
-	if not char then return end
-	return char:FindFirstChildOfClass("Humanoid")
-end
+-- TOP BAR
+local top = Instance.new("TextLabel")
+top.Size = UDim2.new(1,0,0,30)
+top.Text = "ADMIN PANEL (LOCAL SCRIPT)"
+top.TextColor3 = Color3.new(1,1,1)
+top.BackgroundColor3 = Color3.fromRGB(0,0,0)
+top.Parent = frame
 
-local function stopAnim()
-	if loopConnection then
-		loopConnection:Disconnect()
-		loopConnection = nil
-	end
-
-	if currentTrack then
-		currentTrack:Stop()
-		currentTrack:Destroy()
-		currentTrack = nil
-	end
-end
-
-local function playAnim(id)
-	local humanoid = getHumanoid()
-	if not humanoid then return end
-
-	local animator = humanoid:FindFirstChildOfClass("Animator")
-	if not animator then
-		animator = Instance.new("Animator")
-		animator.Parent = humanoid
-	end
-
-	if currentTrack then
-		currentTrack:Stop()
-		currentTrack:Destroy()
-	end
-
-	local anim = Instance.new("Animation")
-	anim.AnimationId = id
-
-	currentTrack = animator:LoadAnimation(anim)
-	currentTrack.Priority = Enum.AnimationPriority.Action
-	currentTrack.Looped = true
-	currentTrack:Play()
-end
-
-local function startLoop()
-	if loopConnection then return end
-
-	loopConnection = runService.RenderStepped:Connect(function()
-		if not enabled then return end
-
-		local humanoid = getHumanoid()
-		if not humanoid then return end
-
-		local moving = humanoid.MoveDirection.Magnitude > 0.1
-
-		if moving then
-			playAnim(RUN_ANIM)
-		else
-			playAnim(IDLE_ANIM)
-		end
-	end)
-end
-
-local function stopAll()
-	enabled = false
-	stopAnim()
-end
-
-boton.MouseButton1Click:Connect(function()
-	enabled = not enabled
-
-	if not enabled then
-		stopAll()
-	else
-		startLoop()
+-- RGB EFFECT
+task.spawn(function()
+	while task.wait() do
+		local t = tick()
+		frame.BackgroundColor3 = Color3.fromRGB(
+			(math.sin(t)+1)*127,
+			(math.sin(t+2)+1)*127,
+			(math.sin(t+4)+1)*127
+		)
 	end
 end)
 
-player.CharacterAdded:Connect(function()
-	stopAll()
+-- PLAYER LIST
+local list = Instance.new("ScrollingFrame")
+list.Size = UDim2.new(1,0,0,150)
+list.Position = UDim2.new(0,0,0,35)
+list.BackgroundTransparency = 1
+list.Parent = frame
+
+local layout = Instance.new("UIListLayout", list)
+
+local selectedPlayer
+
+local function refreshPlayers()
+	for _,v in pairs(list:GetChildren()) do
+		if v:IsA("TextButton") then v:Destroy() end
+	end
+
+	for _,p in pairs(Players:GetPlayers()) do
+		local b = Instance.new("TextButton")
+		b.Size = UDim2.new(1,0,0,28)
+		b.Text = p.Name
+		b.Parent = list
+
+		b.MouseButton1Click:Connect(function()
+			selectedPlayer = p
+			print("Selected:", p.Name)
+		end)
+	end
+end
+
+Players.PlayerAdded:Connect(refreshPlayers)
+Players.PlayerRemoving:Connect(refreshPlayers)
+refreshPlayers()
+
+-- EMOTE BOX
+local box = Instance.new("TextBox")
+box.Size = UDim2.new(1,0,0,30)
+box.Position = UDim2.new(0,0,0,195)
+box.PlaceholderText = "Animation ID (R15)"
+box.Parent = frame
+
+local function playAnim(id)
+	local char = lp.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if not hum then return end
+
+	local anim = Instance.new("Animation")
+	anim.AnimationId = "rbxassetid://"..id
+
+	local track = hum:LoadAnimation(anim)
+	track:Play()
+end
+
+-- EMOTE BUTTON
+local emoteBtn = Instance.new("TextButton")
+emoteBtn.Size = UDim2.new(1,0,0,30)
+emoteBtn.Position = UDim2.new(0,0,0,230)
+emoteBtn.Text = "PLAY EMOTE (LOCAL)"
+emoteBtn.Parent = frame
+
+emoteBtn.MouseButton1Click:Connect(function()
+	local id = tonumber(box.Text)
+	if id then
+		playAnim(id)
+	end
+end)
+
+-- COMMAND CONSOLE
+local cmd = Instance.new("TextBox")
+cmd.Size = UDim2.new(1,0,0,30)
+cmd.Position = UDim2.new(0,0,0,265)
+cmd.PlaceholderText = "Command: /loop id"
+cmd.Parent = frame
+
+local looping = false
+local loopId = nil
+
+cmd.FocusLost:Connect(function(enter)
+	if not enter then return end
+
+	local text = cmd.Text
+	cmd.Text = ""
+
+	local args = string.split(text, " ")
+
+	if args[1] == "/loop" and tonumber(args[2]) then
+		loopId = tonumber(args[2])
+		looping = true
+		print("Loop started:", loopId)
+	end
+
+	if args[1] == "/stop" then
+		looping = false
+		print("Loop stopped")
+	end
+end)
+
+RunService.RenderStepped:Connect(function()
+	if looping and loopId then
+		playAnim(loopId)
+	end
+end)
+
+-- FAKE ADMIN BUTTONS
+local function make(txt,y)
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.new(1,0,0,28)
+	b.Position = UDim2.new(0,0,0,y)
+	b.Text = txt
+	b.Parent = frame
+	return b
+end
+
+local killBtn = make("KILL PLAYER (LOCAL FAKE)", 310)
+local kickBtn = make("KICK PLAYER (LOCAL FAKE)", 340)
+local banBtn  = make("BAN PLAYER (LOCAL FAKE)", 370)
+
+killBtn.MouseButton1Click:Connect(function()
+	print("KILL pressed:", selectedPlayer and selectedPlayer.Name)
+end)
+
+kickBtn.MouseButton1Click:Connect(function()
+	print("KICK pressed:", selectedPlayer and selectedPlayer.Name)
+end)
+
+banBtn.MouseButton1Click:Connect(function()
+	print("BAN pressed:", selectedPlayer and selectedPlayer.Name)
 end)
